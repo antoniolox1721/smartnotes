@@ -1,46 +1,41 @@
 # ============================================================================
-# wrangler.toml  —  the settings file for our Cloudflare app.
+# wrangler.toml  —  the settings Cloudflare reads when we deploy.
 #
-# Wrangler is Cloudflare's command-line tool. When we run "npm run deploy",
-# Wrangler reads THIS file to know what to upload and which Cloudflare
-# services (database, AI, etc.) our code is allowed to use.
-#
-# Each "binding" below becomes a variable on `env` inside our code.
-# Example: the database binding "DB" is used as `env.DB` in src/index.js.
+# Two jobs are described here:
+#   1. Serve our built React website (the "dist" folder) to visitors.
+#   2. Run our Worker code for any request that starts with "/api/".
 # ============================================================================
 
-name = "smartnotes"                 # the app's name (also part of the URL)
-main = "src/index.js"               # the file Cloudflare runs first
-compatibility_date = "2025-06-01"   # pins the runtime to how it behaved on this date
+name = "smartnotes"
+main = "worker/index.js"            # the backend code (the API)
+compatibility_date = "2025-06-01"
 
-# --- Database (used in code as env.DB) ---
-# D1 is Cloudflare's database. It's where our notes are saved.
+# --- The website (our built React app) ---
+[assets]
+directory = "./dist"                          # the folder Vite builds into
+not_found_handling = "single-page-application" # always show our app for unknown pages
+run_worker_first = ["/api/*"]                 # but let the Worker handle "/api/..." first
+
+# --- Database (env.DB) ---
 [[d1_databases]]
 binding = "DB"
 database_name = "smartnotes-db"
 database_id = "cd597906-2c52-4b1d-95c7-72acb7386304"
 
-# --- AI (used in code as env.AI) ---
-# Workers AI lets us run AI models (for summaries, answers, and search).
+# --- AI (env.AI): summaries, answers, and search "meaning" ---
 [ai]
 binding = "AI"
 
-# --- Search index (used in code as env.VECTORIZE) ---
-# Vectorize stores the "meaning" of each note so we can search by idea,
-# not just by exact words.
+# --- Search index (env.VECTORIZE): finds notes by meaning ---
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "smartnotes-index"
 
-# --- Fast storage (used in code as env.CACHE) ---
-# KV is a simple, very fast key/value store. We use it to remember the
-# pre-made "daily digest" so we don't rebuild it on every visit.
+# --- Fast storage (env.CACHE): remembers the daily digest ---
 [[kv_namespaces]]
 binding = "CACHE"
 id = "b9460fca469b4c16af77e799cfcf8c5b"
 
-# --- Scheduled job (Cron) ---
-# This tells Cloudflare to run our scheduled() function automatically.
-# "0 8 * * *" means "every day at 08:00 UTC". It rebuilds the daily digest.
+# --- Scheduled job: rebuild the digest daily at 08:00 UTC ---
 [triggers]
 crons = ["0 8 * * *"]
